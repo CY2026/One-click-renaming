@@ -11,5 +11,28 @@
         <input type="file" id="file" name="file" required><br><br>
         <input type="submit" value="上传">
     </form>
+    <div id="download-link" style="display:none;">
+        <a href="#" id="download-file">点击下载处理后的文件</a>
+    </div>
+    <script>
+        document.querySelector('form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('download-file').href = data.download_url;
+                    document.getElementById('download-link').style.display = 'block';
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
 </body>
 </html>
