@@ -85,6 +85,19 @@ socket.on('queue_status', (data) => {
     }
 });
 
+socket.on('url', (data) => {
+    if (document.getElementById('user_id').value === data.user_id) {
+        download(data.url);
+    }
+})
+
+function download(url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.innerText = '若浏览器未下载，点击此链接';
+    document.getElementById('messages-container').appendChild(a);
+    a.click();
+}
 function appendMessage(message, type) {
     // 获取消息容器元素
     const container = document.getElementById('messages-container');

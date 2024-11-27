@@ -59,15 +59,18 @@ def zip_directory(dir_path):
     :param dir_path: 需要压缩的目录路径
     """
     error_code = None
-    try:
-        # 压缩目录
-        shutil.make_archive(dir_path, 'zip', dir_path)
-    except FileNotFoundError:
+
+    # 确保目录存在
+    if not os.path.exists(dir_path):
         error_code = f"错误：目录 {dir_path} 不存在。"
-    except PermissionError:
-        error_code = f"错误：没有权限访问 {dir_path}。"
-    except Exception as e:
-        error_code = f"未知错误：{e}"
+    else:
+        try:
+            # 压缩目录
+            shutil.make_archive(dir_path, 'zip', dir_path)
+        except PermissionError:
+            error_code = f"错误：没有权限访问 {dir_path}。"
+        except Exception as e:
+            error_code = f"未知错误：{e}"
     return error_code
 
 
@@ -154,3 +157,4 @@ def file_process(image_folder, excel_path, output_folder):
                 print(f"文件 {filename} 已重命名并保存为: {new_filepath}")
             else:
                 print(f"未在图片 {filename} 中找到姓名或对应的学号。")
+    return True

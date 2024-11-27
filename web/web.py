@@ -11,13 +11,10 @@ socketio = SocketIO(app)
 
 # 定义上传目录和处理目录
 UPLOAD_FOLDER = 'html/uploads/'
-PROCESSED_FOLDER = 'html/processed/'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 
 # 创建上传目录和处理目录
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 # 创建任务队列
 task_queue = Queue()
@@ -34,12 +31,13 @@ def process_task(task):
             checkfilecode = check_file(unzipcode["path"])
             if checkfilecode["xlsx_dir_found"] is True and checkfilecode["img_dir_found"] is True and checkfilecode["img_file_found"] is True:
                 callback('progress', {'user_id': user_id, 'message': '文件格式正确，开始处理'})
-                fileprocesscode = file_process(checkfilecode["img_dir"], checkfilecode["xlsx_dir"], unzipcode["path"])
-                if fileprocesscode["success"] is True:
+                fileprocesscode = file_process(checkfilecode["img_dir"], checkfilecode["xlsx_path"], unzipcode["path"])
+                if fileprocesscode is True:
                     callback('progress', {'user_id': user_id, 'message': '文件处理完成，等待压缩'})
                     zipcode = zip_directory(unzipcode["path"])
                     if zipcode is None:
                         callback('progress', {'user_id': user_id, 'message': '文件压缩完成，等待下发下载链接'})
+                        callback('url', {'user_id': user_id, 'url': f"/download/{user_id}"})
                     else:
                         callback('error', {'user_id': user_id, 'message': '文件压缩错误，请联系网站管理员'})
                 else:
@@ -113,13 +111,13 @@ def upload_file():
 
 
 
-@app.route('/download/<user_id>/<filename>')
-def download_file(user_id, filename):
+@app.route('/download/<user_id>')
+def download_file(user_id):
     """
     提供处理后的文件下载。
     用户ID和文件名是URL的一部分。
     """
-    return send_from_directory(os.path.join(app.config['PROCESSED_FOLDER'], user_id), filename)
+    return send_from_directory('html/uploads/', f"{user_id}.zip")
 
 @app.route('/')
 def serve_root():
