@@ -4,9 +4,10 @@
     <title>Upload File</title>
     <style>
         .message {
-            margin: 5px 0;
-            padding: 10px;
-            border-radius: 5px;
+            margin: 3px 0;
+            padding: 5px;
+            border-radius: 3px;
+            display: block;
         }
         .success {
             background-color: #d4edda;
@@ -20,9 +21,15 @@
             background-color: #e2e3e5;
             color: #383d41;
         }
+        .tooltip {
+          position: absolute;
+          background-color: #333;
+          color: white;
+          padding: 10px;
+          border-radius: 5px;
+          z-index: 1000;
+        }
     </style>
-</head>
-
 </head>
 <body>
     <form action="/upload" method="post" enctype="multipart/form-data">
@@ -32,6 +39,7 @@
         <input type="file" id="file" name="file" required><br><br>
         <input type="submit" value="上传">
     </form>
+    <!--<div id="test"></div>-->
     <div id="queue-status" style="margin-top: 20px; color: blue;"></div>
     <div id="messages-container" style="margin-top: 20px;"></div>
     <div id="progress" style="margin-top: 20px;"></div>
@@ -91,6 +99,35 @@ socket.on('url', (data) => {
     }
 })
 
+socket.on('fprogress', (data) => {
+    if (document.getElementById('user_id').value === data.user_id) {
+        appendFileMessage(appendMessage("OCR日志", 'info')).innerText = data.message;
+        appendFileMessage(appendMessage("OCR报错", 'error')).innerText = data.error;
+    }
+});
+
+//<div id="tooltip" class="tooltip" style="display: none;">这是浮动窗口内容</div>
+function appendFileMessage(input) {
+    const errorMessage = document.createElement('a')
+    //const input = input;
+    errorMessage.id = "tooltip";
+    errorMessage.className = "tooltip";
+    errorMessage.style.display = "none";
+
+    input.appendChild(errorMessage);
+
+    input.addEventListener('mouseover', function() {
+        errorMessage.style.display = 'block';
+        //errorMessage.style.left = input.pageX + 1000 + 'px';
+    });
+
+    input.addEventListener('mouseout', function() {
+        errorMessage.style.display = 'none';
+    });
+
+    return errorMessage;
+}
+
 function download(url) {
     const a = document.createElement('a');
     a.href = url;
@@ -98,18 +135,21 @@ function download(url) {
     document.getElementById('messages-container').appendChild(a);
     a.click();
 }
+
 function appendMessage(message, type) {
     // 获取消息容器元素
     const container = document.getElementById('messages-container');
     // 创建一个新的消息元素
-    const messageElement = document.createElement('div');
+    const messageElement = document.createElement('a');
     // 设置消息元素的文本内容
     messageElement.innerText = message;
     // 为消息元素添加通用的消息样式类和特定类型样式类
     messageElement.classList.add('message', type);
     // 将消息元素添加到消息容器中
     container.appendChild(messageElement);
+    return messageElement;
 }
+
 </script>
 
 </body>

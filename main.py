@@ -4,6 +4,7 @@ import zipfile
 import pandas as pd
 import pytesseract
 from PIL import Image
+from django.db.models.expressions import result
 
 # 配置路径
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -119,6 +120,8 @@ def file_process(image_folder, excel_path, output_folder):
     :param excel_path: 存储学号的Excel文件路径
     :param output_folder: 保存重命名文件的文件夹路径
     """
+    error_code = []
+    return_code = []
     # 确保输出文件夹存在
     os.makedirs(output_folder, exist_ok=True)
 
@@ -154,7 +157,13 @@ def file_process(image_folder, excel_path, output_folder):
                 new_filename = f"{student_id}{name}.png"
                 new_filepath = os.path.join(output_folder, new_filename)
                 image.save(new_filepath)
+                return_code.append(f"文件 {filename} 已重命名并保存为: {new_filepath}。\n")
                 print(f"文件 {filename} 已重命名并保存为: {new_filepath}")
             else:
+                error_code.append(f"未在图片 {filename} 中找到姓名或对应的学号。\n")
                 print(f"未在图片 {filename} 中找到姓名或对应的学号。")
-    return True
+    result = {
+        'error': error_code,
+        'return': return_code
+    }
+    return result

@@ -32,7 +32,8 @@ def process_task(task):
             if checkfilecode["xlsx_dir_found"] is True and checkfilecode["img_dir_found"] is True and checkfilecode["img_file_found"] is True:
                 callback('progress', {'user_id': user_id, 'message': '文件格式正确，开始处理'})
                 fileprocesscode = file_process(checkfilecode["img_dir"], checkfilecode["xlsx_path"], unzipcode["path"])
-                if fileprocesscode is True:
+                if len(fileprocesscode["return"]) != 0:
+                    callback('fprogress', {'user_id': user_id, 'message': fileprocesscode["return"], 'error': fileprocesscode["error"]})
                     callback('progress', {'user_id': user_id, 'message': '文件处理完成，等待压缩'})
                     zipcode = zip_directory(unzipcode["path"])
                     if zipcode is None:
@@ -41,7 +42,7 @@ def process_task(task):
                     else:
                         callback('error', {'user_id': user_id, 'message': '文件压缩错误，请联系网站管理员'})
                 else:
-                    callback('error', {'user_id': user_id, 'message': f"文件处理错误：{fileprocesscode['error']}"})
+                    callback('error', {'user_id': user_id, 'message': f"文件处理错误，请联系网站管理员"})
             else:
                 if not checkfilecode["xlsx_dir_found"]:
                     callback('error', {'user_id': user_id, 'message': '文件格式错误：未找到xlsx文件'})
@@ -50,7 +51,7 @@ def process_task(task):
                 if not checkfilecode["img_file_found"]:
                     callback('error', {'user_id': user_id, 'message': '文件格式错误：未找到img文件夹下的图片文件'})
         else:
-            callback('error', {'user_id': user_id, 'error': f"文件解压错误：{unzipcode['error']}"})
+            callback('error', {'user_id': user_id, 'message': f"文件解压错误：{unzipcode['error']}"})
 
 def worker():
     while True:
