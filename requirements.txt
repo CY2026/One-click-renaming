@@ -1,3 +1,5 @@
 pandas
 pytesseract
 openpyxl
+flask_socketio
+flask

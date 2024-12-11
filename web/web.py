@@ -1,19 +1,76 @@
 from flask import Flask, request, send_from_directory, jsonify, make_response
 import os
-from datetime import datetime
+from main import check_file, file_process, unzip_file, zip_directory
+from flask_socketio import SocketIO, emit
+from queue import Queue
+import threading
 
 # 初始化Flask应用
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # 定义上传目录和处理目录
 UPLOAD_FOLDER = 'html/uploads/'
-PROCESSED_FOLDER = 'html/processed/'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 
 # 创建上传目录和处理目录
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+
+# 创建任务队列
+task_queue = Queue()
+
+# 创建线程锁
+lock = threading.Lock()
+
+def process_task(task):
+    user_id, file_path = task
+    with lock:
+        unzipcode = unzip_file(file_path)
+        if unzipcode["error"] is None:
+            callback('progress', {'user_id': user_id, 'message': '文件解压完成'})
+            checkfilecode = check_file(unzipcode["path"])
+            if checkfilecode["xlsx_dir_found"] is True and checkfilecode["img_dir_found"] is True and checkfilecode["img_file_found"] is True:
+                callback('progress', {'user_id': user_id, 'message': '文件格式正确，开始处理'})
+                fileprocesscode = file_process(checkfilecode["img_dir"], checkfilecode["xlsx_path"], unzipcode["path"])
+                if len(fileprocesscode["return"]) != 0:
+                    callback('fprogress', {'user_id': user_id, 'message': fileprocesscode["return"], 'error': fileprocesscode["error"]})
+                    callback('progress', {'user_id': user_id, 'message': '文件处理完成，等待压缩'})
+                    zipcode = zip_directory(unzipcode["path"])
+                    if zipcode is None:
+                        callback('progress', {'user_id': user_id, 'message': '文件压缩完成，等待下发下载链接'})
+                        callback('url', {'user_id': user_id, 'url': f"/download/{user_id}"})
+                    else:
+                        callback('error', {'user_id': user_id, 'message': '文件压缩错误，请联系网站管理员'})
+                else:
+                    callback('error', {'user_id': user_id, 'message': f"文件处理错误，请联系网站管理员"})
+            else:
+                if not checkfilecode["xlsx_dir_found"]:
+                    callback('error', {'user_id': user_id, 'message': '文件格式错误：未找到xlsx文件'})
+                if not checkfilecode["img_dir_found"]:
+                    callback('error', {'user_id': user_id, 'message': '文件格式错误：未找到img文件夹'})
+                if not checkfilecode["img_file_found"]:
+                    callback('error', {'user_id': user_id, 'message': '文件格式错误：未找到img文件夹下的图片文件'})
+        else:
+            callback('error', {'user_id': user_id, 'message': f"文件解压错误：{unzipcode['error']}"})
+
+def worker():
+    while True:
+        task = task_queue.get()
+        if task is None:
+            break
+        process_task(task)
+        task_queue.task_done()
+
+        # 发送当前队列长度
+        queue_length = task_queue.qsize()
+        callback('queue_status', {'user_id': task[0], 'message': f'任务处理完成，当前队列长度：{queue_length}', 'queue_length': queue_length})
+
+
+# 启动工作线程
+threading.Thread(target=worker, daemon=True).start()
+
+def callback(event, args):
+    socketio.emit(event, args, namespace='/')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -39,35 +96,29 @@ def upload_file():
     os.makedirs(user_folder, exist_ok=True)
 
     # 保存文件到子目录
-    file_path = os.path.join(user_folder, file.filename)
+    file_path = os.path.normpath(os.path.join(user_folder, file.filename))
     file.save(file_path)
 
-    # 处理文件
+    # 将任务添加到队列
+    task_queue.put((user_id, file_path))
 
+    # 发送排队状态信息
+    queue_position = task_queue.qsize()
+    callback('queue_status', {'user_id': user_id, 'message': f'您的任务已加入队列，当前排队位置：{queue_position}'})
 
-
-
-
-    # 假设处理完成后生成的文件路径
-    processed_file_name = f"{user_id}_{file.filename}"
-    processed_file_path = os.path.join(PROCESSED_FOLDER, user_id, processed_file_name)
-
-    # 返回下载链接
-    download_url = f"/download/{user_id}/{processed_file_name}"
-
-    # 设置用户ID到Cookies
-    response = make_response(jsonify({'success': True, 'message': 'File uploaded and processing started', 'download_url': download_url}))
+    response = make_response()
     response.set_cookie('user_id', user_id)
-
     return response
 
-@app.route('/download/<user_id>/<filename>')
-def download_file(user_id, filename):
+
+
+@app.route('/download/<user_id>')
+def download_file(user_id):
     """
     提供处理后的文件下载。
     用户ID和文件名是URL的一部分。
     """
-    return send_from_directory(os.path.join(app.config['PROCESSED_FOLDER'], user_id), filename)
+    return send_from_directory('html/uploads/', f"{user_id}.zip")
 
 @app.route('/')
 def serve_root():
@@ -78,4 +129,5 @@ def serve_root():
     return send_from_directory('html/', 'index.html')
 
 if __name__ == '__main__':
-    app.run(port=8000)
+    socketio.run(app, port=8000, allow_unsafe_werkzeug=True)
+
